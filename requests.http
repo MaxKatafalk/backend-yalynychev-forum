@@ -1,44 +1,146 @@
-# Запросы для демонстрации. В VS Code нужно расширение REST Client, в JetBrains IDE всё встроено.
-# Над каждым запросом появляется ссылка «Send Request».
-# items заменить на свой ресурс, тела на поля своей сущности.
+@baseUrl = http://localhost:8000
 
-@base = http://localhost:8000
+### 1. Состояние сервиса — 200
+GET {{baseUrl}}/health
 
-### Сервис жив?
-GET {{base}}/health
-
-### Создать
-POST {{base}}/api/items
+### 2. Создать тему — 201. Выполнить перед запросами к createdTopic.
+# @name createdTopic
+POST {{baseUrl}}/api/topics
 Content-Type: application/json
 
-{ "title": "Первая запись" }
+{"title": "Обсуждение Python", "author": "Иван", "status": "open"}
 
-### Список
-GET {{base}}/api/items
-
-### Получить одну запись
-GET {{base}}/api/items/1
-
-### Изменить
-PATCH {{base}}/api/items/1
+### 3. Вторая тема для проверки фильтра — 201
+POST {{baseUrl}}/api/topics
 Content-Type: application/json
 
-{ "title": "Изменённая запись" }
+{"title": "Обсуждение FastAPI", "author": "Анна", "status": "closed"}
 
-### Удалить
-DELETE {{base}}/api/items/1
+### 4. Список тем — 200
+GET {{baseUrl}}/api/topics
 
-### После удаления должен быть 404
-GET {{base}}/api/items/1
+### 5. Тема по id из ответа запроса createdTopic — 200
+GET {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
 
-### Сломанный JSON, должен быть 400
-POST {{base}}/api/items
+### 6. Закрыть тему — 200, другие поля сохраняются
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
 Content-Type: application/json
 
-{ "title":
+{"status": "closed"}
 
-### Пустое обязательное поле, должен быть 400
-POST {{base}}/api/items
+### 7. Изменить заголовок и автора, снова открыть тему — 200
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
 Content-Type: application/json
 
-{ "title": "" }
+{"title": "Новый заголовок", "author": "Иван", "status": "open"}
+
+### 8. Фильтр по автору — 200
+GET {{baseUrl}}/api/topics?author=Иван
+
+### 9. Фильтр по статусу и пагинация — 200
+GET {{baseUrl}}/api/topics?limit=10&offset=0&status=open
+
+### 10. Совместные фильтры — 200
+GET {{baseUrl}}/api/topics?author=Иван&status=open&limit=1&offset=0
+
+### 11. Вторая страница — 200
+GET {{baseUrl}}/api/topics?limit=1&offset=1
+
+### 12. Пустой результат — 200, []
+GET {{baseUrl}}/api/topics?offset=999999
+
+### 13. Несуществующая тема — 404
+GET {{baseUrl}}/api/topics/999999
+
+### 14. Обновить несуществующую тему — 404
+PATCH {{baseUrl}}/api/topics/999999
+Content-Type: application/json
+
+{"status": "closed"}
+
+### 15. Пустой заголовок — 400, field=title
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title": "", "author": "Иван", "status": "open"}
+
+### 16. Заголовок из пробелов — 400, field=title
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title": "   ", "author": "Иван"}
+
+### 17. Отсутствует заголовок — 400, field=title
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"author": "Иван", "status": "open"}
+
+### 18. Пустой автор — 400, field=author
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title": "Тема", "author": "", "status": "open"}
+
+### 19. Недопустимый статус — 400, field=status
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title": "Тема", "author": "Иван", "status": "archived"}
+
+### 20. Неверный тип заголовка — 400, field=title
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title": 123, "author": "Иван"}
+
+### 21. id назначает только сервер — 400, field=id
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"id": 10, "title": "Тема", "author": "Иван"}
+
+### 22. Сломанный JSON — 400, field=body
+POST {{baseUrl}}/api/topics
+Content-Type: application/json
+
+{"title":
+
+### 23. Некорректная пагинация — 400, field=limit
+GET {{baseUrl}}/api/topics?limit=0
+
+### 24. Отрицательный offset — 400, field=offset
+GET {{baseUrl}}/api/topics?offset=-1
+
+### 25. Некорректный статус фильтра — 400, field=status
+GET {{baseUrl}}/api/topics?status=archived
+
+### 26. Некорректный id — 400, field=topic_id
+GET {{baseUrl}}/api/topics/abc
+
+### 27. Пустое обновление — 400, field=body
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+Content-Type: application/json
+
+{}
+
+### 28. Явный null — 400, field=author
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+Content-Type: application/json
+
+{"author": null}
+
+### 29. Swagger UI — 200 HTML
+GET {{baseUrl}}/docs
+
+### 30. OpenAPI — 200 JSON
+GET {{baseUrl}}/openapi.json
+
+### 31. Удалить созданную тему — 204, пустое тело
+DELETE {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+
+### 32. После удаления — 404
+GET {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+
+### 33. Удалить несуществующую тему — 404
+DELETE {{baseUrl}}/api/topics/999999
