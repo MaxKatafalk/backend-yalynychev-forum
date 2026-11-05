@@ -4,7 +4,29 @@ HTTP API для тем форума и сообщений в них. Поля т
 
 Стек: Python, FastAPI, Pydantic, Uvicorn, SQLAlchemy, SQLite, Alembic.
 
-Седьмой этап лабы 2: добавлены запрет сообщений в закрытую тему с ответом 409 и статистика активности тем. Проверка статуса и создание сообщения выполняются одной транзакцией.
+Реализованы базовые требования лабораторной 2 и обе звёздочки. Сохранены валидация, фильтры, пагинация, Swagger и логи запросов из первой лабораторной.
+
+## Чек-лист лабораторной 2
+
+### База
+
+- [x] Темы и сообщения сохраняются после перезапуска сервиса.
+- [x] Сообщения связаны с темами внешним ключом; вложенный маршрут поддерживает создание и список.
+- [x] Схема создаётся миграциями из репозитория.
+- [x] Строка подключения берётся из окружения; есть `.env.example`, паролей в коде нет.
+- [x] ER-диаграмма в README показывает обе таблицы, ключи и связь 1:N.
+- [x] Строка SQL-инъекции сохраняется как обычный текст, таблицы остаются на месте.
+
+### ★ Миграции, индекс, поиск
+
+- [x] Миграции выполняются через Alembic; сиды заполняют пустую базу одной командой.
+- [x] Индекс автора создаётся миграцией; ниже приведены запрос, EXPLAIN и реальный вывод с USING INDEX.
+- [x] Поиск `?q=` по заголовку работает без учёта регистра и выполняется в SQL.
+
+### ★★ Правило темы и статистика
+
+- [x] Новое сообщение в закрытую тему даёт 409 с причиной; проверка и запись идут одной транзакцией.
+- [x] Статистика самых активных тем считается базой через COUNT и GROUP BY.
 
 ## Запуск
 
@@ -12,11 +34,10 @@ HTTP API для тем форума и сообщений в них. Поля т
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-При первой настройке скопируйте пример настроек в `.env`:
+Если файла `.env` ещё нет, скопируйте пример настроек:
 
 ```powershell
 Copy-Item .env.example .env
@@ -27,13 +48,13 @@ Copy-Item .env.example .env
 Создайте таблицы командой миграции из корня проекта:
 
 ```powershell
-python -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
 Запустите сервис:
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Остановка сервера — `Ctrl+C`.
@@ -54,7 +75,7 @@ DATABASE_URL=sqlite:///./forum.db
 Проверка подключения:
 
 ```powershell
-python -c "from app.database import SessionLocal; db = SessionLocal(); print(db.connection().exec_driver_sql('SELECT 1').scalar()); db.close()"
+.\.venv\Scripts\python.exe -c "from app.database import SessionLocal; db = SessionLocal(); print(db.connection().exec_driver_sql('SELECT 1').scalar()); db.close()"
 ```
 
 Ожидаемый результат — `1`. При первом подключении появляется файл `forum.db`.
@@ -72,7 +93,7 @@ python -c "from app.database import SessionLocal; db = SessionLocal(); print(db.
 Применить все миграции:
 
 ```powershell
-python -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
 Повторный запуск команды не создаёт таблицы заново и не удаляет записи.
@@ -80,7 +101,7 @@ python -m alembic upgrade head
 Посмотреть текущую версию:
 
 ```powershell
-python -m alembic current
+.\.venv\Scripts\python.exe -m alembic current
 ```
 
 После применения всех миграций команда выводит `0002 (head)`.
@@ -88,7 +109,7 @@ python -m alembic current
 Проверить список таблиц:
 
 ```powershell
-python -c "from sqlalchemy import inspect; from app.database import engine; print(inspect(engine).get_table_names())"
+.\.venv\Scripts\python.exe -c "from sqlalchemy import inspect; from app.database import engine; print(inspect(engine).get_table_names())"
 ```
 
 Ожидаемый результат: `['alembic_version', 'messages', 'topics']`.
@@ -128,8 +149,8 @@ erDiagram
 Из корня проекта примените миграции и запустите заполнение:
 
 ```powershell
-python -m alembic upgrade head
-python -m app.seed
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m app.seed
 ```
 
 В пустой базе появятся 4 темы и 6 сообщений:
@@ -173,7 +194,6 @@ python -m app.seed
 Заголовок обязателен: 1–200 символов, автор: 1–100. Статус по умолчанию — `open`. Неверные данные и сломанный JSON возвращают 400 в формате `{"error":"текст","field":"поле"}`.
 
 Фильтры и пагинация: `/api/topics?author=Иван&status=open&limit=10&offset=0`. `limit`: 1–100, `offset`: от 0. Каждый запрос записывается в лог: метод, путь, статус, время в миллисекундах.
-
 
 ## Поиск тем
 
@@ -224,8 +244,8 @@ LIMIT 10 OFFSET 0;
 Чтобы получить план из своей базы, примените миграции и выполните:
 
 ```powershell
-python -m alembic upgrade head
-python -m app.explain
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m app.explain
 ```
 
 Вывод проверки на тестовой базе:
@@ -322,15 +342,35 @@ ORDER BY message_count DESC, topics.id;
 
 ## Проверка
 
-Откройте http://localhost:8000/docs и выполняйте запросы через **Try it out → Execute**. Примеры запросов находятся в `requests.http`.
+Запустите сервис по инструкции выше. Откройте `http://localhost:8000/docs` и выполняйте
+запросы через **Try it out → Execute**. В `requests.http` находятся 50 примеров:
+темы, сообщения, ошибки, поиск, правило закрытой темы и статистика.
 
-Для проверки операций с темами через backcheck откройте второй терминал в папке проекта:
+Официальный чекер backcheck включён в `requirements.txt` и устанавливается вместе
+с остальными зависимостями проекта. Закреплена проверенная версия из репозитория преподавателя.
+
+Во втором терминале из корня проекта выполните:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 $env:NO_PROXY = "localhost,127.0.0.1,::1"
-python -m backcheck --lab 1 --stars
+.\.venv\Scripts\python.exe -m backcheck --lab 2 --stars
 ```
+
+Для проверки сохранённых возможностей первой лабораторной:
+
+```powershell
+.\.venv\Scripts\python.exe -m backcheck --lab 1 --stars
+```
+
+Знак `?` означает, что пункт нужно показать преподавателю: перезапуск, применение миграций,
+заполнение базы, ER-диаграмму и место в коде с транзакцией или агрегатным SQL.
+Это не ошибка и не признак отсутствующей функции.
+
+[Отчёт итоговой проверки](docs/lab-2-check.md) содержит результаты официального backcheck
+и дополнительных проверок. Проверено в отдельной копии проекта с новым окружением и пустой SQLite.
+Все 50 примеров запросов дали ожидаемые коды. Проваленных проверок backcheck нет.
+Отдельно проверены пункты для ручного показа: перезапуск, миграции, сиды, индекс и транзакция.
 
 ### Сохранение после перезапуска
 
@@ -344,6 +384,17 @@ python -m backcheck --lab 1 --stars
 Для проверки параметров SQL создайте тему с заголовком `'); DROP TABLE topics;--`.
 Он должен сохраниться как обычный текст. Остальные темы и таблицы остаются на месте.
 
-Контракт заполнен в `contract.json`. Знаки `?` у README, Swagger и логов означают ручную проверку на сдаче.
+Контракт для базы и обеих звёздочек заполнен в `contract.json`.
 
-Сдача: PR из ветки `lab-2` в `main`.
+## Сдача
+
+1. Проверьте проект командами из раздела выше.
+2. Сохраните итоговые изменения коммитом и отправьте ветку `lab-2` на GitHub.
+3. Откройте PR в своём репозитории: `lab-2` → `main`. Шаблон PR содержит чек-лист второй лабораторной.
+4. На сдаче покажите API, миграции, сиды, EXPLAIN, перезапуск и код транзакции.
+5. После приёма лабораторной PR вливается в `main`.
+
+Техническая часть даёт до 10 баллов: база 6, ★ 2, ★★ 2.
+Ещё до 2 баллов ставятся за ответ на вопрос и объяснение кода.
+[Вопросы к лабораторной](docs/lab-2.md#вопросы-к-лабе) и
+[правила сдачи и сроки](docs/README.md#как-сдавать).
