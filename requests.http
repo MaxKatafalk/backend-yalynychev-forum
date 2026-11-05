@@ -178,11 +178,44 @@ GET {{baseUrl}}/api/topics?q=НесуществующееСлово645
 ### 40. Поиск из пробелов — 400, field=q
 GET {{baseUrl}}/api/topics?q=%20%20
 
-### 41. Удалить созданную тему — 204, пустое тело
+### 41. Статистика тем — 200
+GET {{baseUrl}}/api/topics/stats
+
+### 42. Закрыть тему — 200
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+Content-Type: application/json
+
+{"status": "closed"}
+
+### 43. Новое сообщение в закрытую тему — 409, field=status
+POST {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}/messages
+Content-Type: application/json
+
+{"author": "Иван", "text": "Это сообщение не должно сохраниться"}
+
+### 44. Читать сообщения закрытой темы можно — 200
+GET {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}/messages
+
+### 45. Снова открыть тему — 200
+PATCH {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
+Content-Type: application/json
+
+{"status": "open"}
+
+### 46. Сообщение после открытия темы — 201
+POST {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}/messages
+Content-Type: application/json
+
+{"author": "Анна", "text": "Теперь писать снова можно"}
+
+### 47. Статистика после нового сообщения — 200
+GET {{baseUrl}}/api/topics/stats
+
+### 48. Удалить созданную тему — 204, пустое тело
 DELETE {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
 
-### 42. После удаления — 404
+### 49. После удаления — 404
 GET {{baseUrl}}/api/topics/{{createdTopic.response.body.$.id}}
 
-### 43. Удалить несуществующую тему — 404
+### 50. Удалить несуществующую тему — 404
 DELETE {{baseUrl}}/api/topics/999999

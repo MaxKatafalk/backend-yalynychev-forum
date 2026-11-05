@@ -30,6 +30,16 @@ class TopicStore:
         statement = statement.order_by(Topic.id).offset(query.offset).limit(query.limit)
         return self.db.scalars(statement).all()
 
+    def stats(self):
+        message_count = func.count(Message.id)
+        statement = (
+            select(Topic.id.label("topic_id"), Topic.title, message_count.label("message_count"))
+            .outerjoin(Message, Message.topic_id == Topic.id)
+            .group_by(Topic.id, Topic.title)
+            .order_by(message_count.desc(), Topic.id)
+        )
+        return self.db.execute(statement).mappings().all()
+
     def update(self, topic_id: int, data: TopicPatch) -> Topic | None:
         topic = self.get(topic_id)
         if topic is None:

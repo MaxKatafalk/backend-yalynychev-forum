@@ -18,6 +18,18 @@
     "create": {"author": "Иван", "text": "Первое сообщение"},
     "parent_field": "topic_id"
   },
+  "rule": {
+    "description": "В закрытую тему нельзя добавлять сообщения",
+    "parent": {"status": "closed"},
+    "setup": [],
+    "violate": {
+      "method": "POST",
+      "path": "/api/topics/{id}/messages",
+      "body": {"author": "Иван", "text": "Проверка закрытой темы"}
+    },
+    "expect_status": 409
+  },
+  "stats_path": "/api/topics/stats",
   "errors": [
     {"body": {"title": ""}, "field": "title"},
     {"body": {"author": ""}, "field": "author"},

@@ -6,11 +6,22 @@ from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Respo
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .database import get_db
-from .schemas import ErrorResponse, HealthResponse, Message, MessageCreate, Topic, TopicCreate, TopicListQuery, TopicPatch
+from .schemas import (
+    ErrorResponse,
+    HealthResponse,
+    Message,
+    MessageCreate,
+    Topic,
+    TopicCreate,
+    TopicListQuery,
+    TopicPatch,
+    TopicStats,
+)
 from .storage import MessageStore, TopicStore
 
 
@@ -18,6 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("forum.requests")
 TopicId = Annotated[int, Path(gt=0, description="Положительный идентификатор темы")]
 NOT_FOUND = {"error": "Тема не найдена", "field": "id"}
+CLOSED_TOPIC = {"error": "В закрытую тему нельзя добавлять сообщения", "field": "status"}
 
 
 def validation_message(error: dict) -> str:
@@ -105,6 +117,13 @@ def create_app() -> FastAPI:
         return TopicStore(db).list(query)
 
     @application.get(
+        "/api/topics/stats", response_model=list[TopicStats],
+        tags=["Темы"], summary="Темы по количеству сообщений",
+    )
+    def topic_stats(db: Session = Depends(get_db)):
+        return TopicStore(db).stats()
+
+    @application.get(
         "/api/topics/{topic_id}", response_model=Topic, tags=["Темы"], summary="Получить тему",
         responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
     )
@@ -137,11 +156,20 @@ def create_app() -> FastAPI:
     @application.post(
         "/api/topics/{topic_id}/messages", response_model=Message, status_code=status.HTTP_201_CREATED,
         tags=["Сообщения"], summary="Создать сообщение в теме",
-        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+        responses={
+            404: {"model": ErrorResponse, "description": "Тема не найдена"},
+            409: {"model": ErrorResponse, "description": "Тема закрыта"},
+        },
     )
     def create_message(topic_id: TopicId, data: MessageCreate, db: Session = Depends(get_db)):
-        if TopicStore(db).get(topic_id) is None:
+        db.execute(text("BEGIN IMMEDIATE"))
+        topic = TopicStore(db).get(topic_id)
+        if topic is None:
+            db.rollback()
             raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if topic.status == "closed":
+            db.rollback()
+            raise HTTPException(status_code=409, detail=CLOSED_TOPIC)
         return MessageStore(db).create(topic_id, data)
 
     @application.get(

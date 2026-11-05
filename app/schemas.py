@@ -52,6 +52,12 @@ class TopicListQuery(BaseModel):
     q: Title | None = Field(default=None, description="Часть заголовка без учёта регистра")
 
 
+class TopicStats(BaseModel):
+    topic_id: int = Field(gt=0, description="Идентификатор темы")
+    title: str = Field(description="Заголовок темы")
+    message_count: int = Field(ge=0, description="Количество сообщений")
+
+
 class MessageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
