@@ -1,8 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Topic
-from .schemas import TopicCreate, TopicListQuery, TopicPatch
+from .models import Message, Topic
+from .schemas import MessageCreate, TopicCreate, TopicListQuery, TopicPatch
 
 
 class TopicStore:
@@ -49,3 +49,19 @@ class TopicStore:
         self.db.delete(topic)
         self.db.commit()
         return True
+
+
+class MessageStore:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, topic_id: int, data: MessageCreate) -> Message:
+        message = Message(topic_id=topic_id, **data.model_dump())
+        self.db.add(message)
+        self.db.commit()
+        self.db.refresh(message)
+        return message
+
+    def list(self, topic_id: int) -> list[Message]:
+        statement = select(Message).where(Message.topic_id == topic_id).order_by(Message.id)
+        return self.db.scalars(statement).all()

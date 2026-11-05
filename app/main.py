@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .database import get_db
-from .schemas import ErrorResponse, HealthResponse, Topic, TopicCreate, TopicListQuery, TopicPatch
-from .storage import TopicStore
+from .schemas import ErrorResponse, HealthResponse, Message, MessageCreate, Topic, TopicCreate, TopicListQuery, TopicPatch
+from .storage import MessageStore, TopicStore
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -49,7 +49,7 @@ def create_app() -> FastAPI:
         title="Форум — лабораторная 2",
         version="2.0.0",
         description=(
-            "CRUD тем форума. Данные хранятся в SQLite и сохраняются после перезапуска. "
+            "CRUD тем форума и сообщения внутри тем. Данные хранятся в SQLite и сохраняются после перезапуска. "
             "Статусы: open — открыта, closed — закрыта. "
         ),
         responses={400: {"model": ErrorResponse, "description": "Ошибка валидации"}},
@@ -133,6 +133,26 @@ def create_app() -> FastAPI:
         if not TopicStore(db).delete(topic_id):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @application.post(
+        "/api/topics/{topic_id}/messages", response_model=Message, status_code=status.HTTP_201_CREATED,
+        tags=["Сообщения"], summary="Создать сообщение в теме",
+        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+    )
+    def create_message(topic_id: TopicId, data: MessageCreate, db: Session = Depends(get_db)):
+        if TopicStore(db).get(topic_id) is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return MessageStore(db).create(topic_id, data)
+
+    @application.get(
+        "/api/topics/{topic_id}/messages", response_model=list[Message],
+        tags=["Сообщения"], summary="Список сообщений темы",
+        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+    )
+    def list_messages(topic_id: TopicId, db: Session = Depends(get_db)):
+        if TopicStore(db).get(topic_id) is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return MessageStore(db).list(topic_id)
 
     def custom_openapi():
         if application.openapi_schema is None:

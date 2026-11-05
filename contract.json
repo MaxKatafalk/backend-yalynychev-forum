@@ -11,6 +11,12 @@
   },
   "update": {"status": "closed"},
   "required_field": "title",
+  "text_field": "title",
+  "child": {
+    "resource": "messages",
+    "create": {"author": "Иван", "text": "Первое сообщение"},
+    "parent_field": "topic_id"
+  },
   "errors": [
     {"body": {"title": ""}, "field": "title"},
     {"body": {"author": ""}, "field": "author"},
