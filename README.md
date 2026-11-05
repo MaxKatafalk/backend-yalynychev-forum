@@ -2,9 +2,9 @@
 
 HTTP API для тем форума. Поля темы: `id`, `title`, `author`, `status` (`open` или `closed`). Идентификатор назначает сервер. Данные хранятся в памяти и исчезают после перезапуска.
 
-Стек: Python, FastAPI, Pydantic, Uvicorn, SQLAlchemy, SQLite.
+Стек: Python, FastAPI, Pydantic, Uvicorn, SQLAlchemy, SQLite, Alembic.
 
-Первый этап лабы 2: подготовлено подключение к SQLite через SQLAlchemy. API тем пока использует память. Таблицы и сохранение тем будут добавлены на следующих этапах.
+Второй этап лабы 2: добавлены таблицы тем и сообщений, связь между ними и первая миграция. API тем пока использует память. Сохранение тем и маршруты сообщений будут добавлены на следующих этапах.
 
 ## Запуск
 
@@ -24,14 +24,19 @@ Copy-Item .env.example .env
 
 Если `.env` уже существует, используйте его и добавьте `DATABASE_URL` из `.env.example`.
 
-Запустите сервис из корня проекта:
+Создайте таблицы командой миграции из корня проекта:
+
+```powershell
+python -m alembic upgrade head
+```
+
+Запустите сервис:
 
 ```powershell
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Остановка сервера — `Ctrl+C`.
-
 
 ## Подключение к базе данных
 
@@ -53,10 +58,68 @@ python -c "from app.database import SessionLocal; db = SessionLocal(); print(db.
 ```
 
 Ожидаемый результат — `1`. При первом подключении появляется файл `forum.db`.
-На этом этапе таблиц в нём ещё нет.
+Таблицы создаются командой `python -m alembic upgrade head`.
 
 Файлы `.env` и `forum.db` уже исключены из Git через `.gitignore`.
 В репозиторий добавляется только пример настроек `.env.example`.
+
+
+## Таблицы и миграции
+
+Модели таблиц описаны в `app/models.py`. Файлы миграций находятся в `migrations/versions`.
+Миграция — это сохранённое изменение схемы базы данных. Alembic применяет миграции по порядку
+и записывает текущую версию в служебную таблицу `alembic_version`.
+
+Применить все миграции:
+
+```powershell
+python -m alembic upgrade head
+```
+
+Повторный запуск команды не создаёт таблицы заново и не удаляет записи.
+
+Посмотреть текущую версию:
+
+```powershell
+python -m alembic current
+```
+
+После первой миграции команда выводит `0001 (head)`.
+
+Проверить список таблиц:
+
+```powershell
+python -c "from sqlalchemy import inspect; from app.database import engine; print(inspect(engine).get_table_names())"
+```
+
+Ожидаемый результат: `['alembic_version', 'messages', 'topics']`.
+
+### Схема базы данных
+
+```mermaid
+erDiagram
+    topics ||--o{ messages : "содержит"
+    topics {
+        integer id PK
+        string title
+        string author
+        string status
+    }
+    messages {
+        integer id PK
+        integer topic_id FK
+        string author
+        text text
+        datetime created_at
+    }
+```
+
+У одной темы может быть много сообщений. Поле `messages.topic_id` ссылается на `topics.id`.
+Сообщение без существующей темы сохранить нельзя. При удалении темы из базы её сообщения
+тоже удаляются.
+
+Статус темы по умолчанию — `open`. База допускает только `open` и `closed`.
+Дата создания сообщения задаётся базой автоматически в UTC.
 
 ## Эндпоинты
 
