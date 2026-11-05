@@ -49,6 +49,7 @@ class TopicListQuery(BaseModel):
     offset: int = Field(default=0, ge=0, description="Сколько подходящих тем пропустить")
     author: Author | None = Field(default=None, description="Точное имя автора с учётом регистра")
     status: TopicStatus | None = Field(default=None, description="Фильтр по статусу")
+    q: Title | None = Field(default=None, description="Часть заголовка без учёта регистра")
 
 
 class MessageCreate(BaseModel):

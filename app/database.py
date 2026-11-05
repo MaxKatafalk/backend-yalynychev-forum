@@ -19,7 +19,8 @@ Base = declarative_base()
 
 
 @event.listens_for(engine, "connect")
-def enable_foreign_keys(connection, connection_record):
+def configure_connection(connection, connection_record):
+    connection.create_function("casefold", 1, str.casefold, deterministic=True)
     cursor = connection.cursor()
     cursor.execute("PRAGMA foreign_keys = ON")
     cursor.close()

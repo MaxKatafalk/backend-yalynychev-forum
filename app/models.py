@@ -11,7 +11,7 @@ class Topic(Base):
 
     id = Column(Integer, primary_key=True)
     title = Column(String(200), nullable=False)
-    author = Column(String(100), nullable=False)
+    author = Column(String(100), nullable=False, index=True)
     status = Column(String(6), nullable=False, server_default="open")
 
 

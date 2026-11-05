@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .models import Message, Topic
@@ -25,6 +25,8 @@ class TopicStore:
             statement = statement.where(Topic.author == query.author)
         if query.status is not None:
             statement = statement.where(Topic.status == query.status)
+        if query.q is not None:
+            statement = statement.where(func.casefold(Topic.title).contains(query.q.casefold(), autoescape=True))
         statement = statement.order_by(Topic.id).offset(query.offset).limit(query.limit)
         return self.db.scalars(statement).all()
 

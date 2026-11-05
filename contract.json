@@ -12,6 +12,7 @@
   "update": {"status": "closed"},
   "required_field": "title",
   "text_field": "title",
+  "search": {"param": "q", "field": "title"},
   "child": {
     "resource": "messages",
     "create": {"author": "Иван", "text": "Первое сообщение"},
