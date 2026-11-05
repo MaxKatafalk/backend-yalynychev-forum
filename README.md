@@ -1,57 +1,51 @@
-<!--
-  Это шаблон README проекта. После создания своего репозитория:
-  1. Переименовать репозиторий в backend-<фамилия>-<тема>, например backend-ivanova-library.
-  2. Заполнить разделы ниже под свою тему и удалить этот комментарий.
-  Задания лаб лежат в папке docs/, начинать с docs/README.md.
--->
+# Форум — лабораторная 1
 
-# Название проекта
+HTTP API для тем форума. Поля темы: `id`, `title`, `author`, `status` (`open` или `closed`). Идентификатор назначает сервер. Данные хранятся в памяти и исчезают после перезапуска.
 
-Тема №__: **...**. Одна фраза: что это и для кого.
+Стек: Python, FastAPI, Pydantic, Uvicorn.
 
-| | |
-| --- | --- |
-| Главная сущность | ... |
-| Связанная сущность (1:N) | ... |
-| Фишка | ... |
-| Стек | язык, фреймворк, база данных |
+## Запуск
 
-## Как запустить
+Нужны Python 3.10+ и Git. Откройте папку проекта в VS Code и выполните в PowerShell:
 
-```bash
-# команды по порядку: от git clone до работающего сервиса
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Сервис работает на `http://localhost:8000`. Запросы для демонстрации лежат в `requests.http`.
+Остановка сервера — `Ctrl+C`.
 
 ## Эндпоинты
 
-| Метод | Путь | Что делает | Ответ |
-| --- | --- | --- | --- |
-| GET | `/health` | Проверка, что сервис жив | 200 `{"status":"ok"}` |
-| POST | `/api/items` | Создать | 201 и объект с `id`; 400 при ошибке |
-| GET | `/api/items` | Список | 200 |
-| GET | `/api/items/{id}` | Получить одну запись | 200; 404 |
-| PATCH | `/api/items/{id}` | Изменить | 200; 400; 404 |
-| DELETE | `/api/items/{id}` | Удалить | 204; 404 |
+| Метод  | Путь               | Результат                |
+| ------ | ------------------ | ------------------------ |
+| GET    | `/health`          | 200, `{"status":"ok"}`   |
+| POST   | `/api/topics`      | 201, созданная тема с id |
+| GET    | `/api/topics`      | 200, массив тем          |
+| GET    | `/api/topics/{id}` | 200 или 404              |
+| PATCH  | `/api/topics/{id}` | 200 или 404              |
+| DELETE | `/api/topics/{id}` | 204 без тела или 404     |
+| GET    | `/docs`            | Swagger UI               |
+| GET    | `/openapi.json`    | Спецификация OpenAPI     |
 
-## ER-диаграмма
+Заголовок обязателен: 1–200 символов, автор: 1–100. Статус по умолчанию — `open`. Неверные данные и сломанный JSON возвращают 400 в формате `{"error":"текст","field":"поле"}`.
 
-<!-- С лабы 2. Блок mermaid GitHub рисует сам. -->
+Фильтры и пагинация: `/api/topics?author=Иван&status=open&limit=10&offset=0`. `limit`: 1–100, `offset`: от 0. Каждый запрос записывается в лог: метод, путь, статус, время в миллисекундах.
 
-```mermaid
-erDiagram
-    parents ||--o{ children : "имеет"
-    parents {
-        int id PK
-        varchar title
-    }
-    children {
-        int id PK
-        int parent_id FK
-    }
+## Проверка
+
+Откройте http://localhost:8000/docs и выполняйте запросы через **Try it out → Execute**. Примеры запросов находятся в `requests.http`.
+
+Для backcheck откройте второй терминал в папке проекта:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+$env:NO_PROXY = "localhost,127.0.0.1,::1"
+python -m backcheck --lab 1 --stars
 ```
 
-## Интерфейс
+Контракт заполнен в `contract.json`. Знаки `?` у README, Swagger и логов означают ручную проверку на сдаче.
 
-<!-- С лабы 4: скриншот, например ![Интерфейс](docs/screenshot.png) -->
+Сдача: PR из ветки `lab-1` в `main`.
