@@ -1,0 +1,53 @@
+[
+  {
+    "title": "Обсуждение Python",
+    "author": "Иван",
+    "status": "open",
+    "messages": [
+      {
+        "author": "Анна",
+        "text": "Как установить зависимости проекта?"
+      },
+      {
+        "author": "Иван",
+        "text": "Используйте pip install -r requirements.txt."
+      },
+      {
+        "author": "Максим",
+        "text": "Спасибо, всё установилось!"
+      }
+    ]
+  },
+  {
+    "title": "Вопросы по FastAPI",
+    "author": "Анна",
+    "status": "open",
+    "messages": [
+      {
+        "author": "Иван",
+        "text": "Где посмотреть документацию API?"
+      },
+      {
+        "author": "Анна",
+        "text": "Откройте страницу /docs."
+      }
+    ]
+  },
+  {
+    "title": "Правила форума",
+    "author": "Максим",
+    "status": "closed",
+    "messages": [
+      {
+        "author": "Максим",
+        "text": "Общайтесь вежливо и не публикуйте спам."
+      }
+    ]
+  },
+  {
+    "title": "Работа с SQLite",
+    "author": "Иван",
+    "status": "open",
+    "messages": []
+  }
+]
