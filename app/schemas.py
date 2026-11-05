@@ -36,7 +36,7 @@ class TopicPatch(BaseModel):
         return self
 
 class Topic(TopicCreate):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
     id: int = Field(gt=0, description="Идентификатор, назначенный сервером")
 
