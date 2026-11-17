@@ -1,43 +1,79 @@
-from threading import RLock
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
-from .schemas import Topic, TopicCreate, TopicListQuery, TopicPatch
+from .models import Message, Topic
+from .schemas import MessageCreate, TopicCreate, TopicListQuery, TopicPatch
 
 
 class TopicStore:
-    def __init__(self):
-        self._topics: dict[int, Topic] = {}
-        self._next_id = 1
-        self._lock = RLock()
+    def __init__(self, db: Session):
+        self.db = db
 
     def create(self, data: TopicCreate) -> Topic:
-        with self._lock:
-            topic = Topic(id=self._next_id, **data.model_dump())
-            self._topics[topic.id] = topic
-            self._next_id += 1
-            return topic
+        topic = Topic(**data.model_dump())
+        self.db.add(topic)
+        self.db.commit()
+        self.db.refresh(topic)
+        return topic
 
     def get(self, topic_id: int) -> Topic | None:
-        with self._lock:
-            return self._topics.get(topic_id)
+        return self.db.get(Topic, topic_id)
 
     def list(self, query: TopicListQuery) -> list[Topic]:
-        with self._lock:
-            topics = sorted(self._topics.values(), key=lambda topic: topic.id)
-            if query.author is not None:
-                topics = [topic for topic in topics if topic.author == query.author]
-            if query.status is not None:
-                topics = [topic for topic in topics if topic.status == query.status]
-            return topics[query.offset:query.offset + query.limit]
+        statement = select(Topic)
+        if query.author is not None:
+            statement = statement.where(Topic.author == query.author)
+        if query.status is not None:
+            statement = statement.where(Topic.status == query.status)
+        if query.q is not None:
+            statement = statement.where(func.casefold(Topic.title).contains(query.q.casefold(), autoescape=True))
+        statement = statement.order_by(Topic.id).offset(query.offset).limit(query.limit)
+        return self.db.scalars(statement).all()
+
+    def stats(self):
+        message_count = func.count(Message.id)
+        statement = (
+            select(Topic.id.label("topic_id"), Topic.title, message_count.label("message_count"))
+            .outerjoin(Message, Message.topic_id == Topic.id)
+            .group_by(Topic.id, Topic.title)
+            .order_by(message_count.desc(), Topic.id)
+        )
+        return self.db.execute(statement).mappings().all()
 
     def update(self, topic_id: int, data: TopicPatch) -> Topic | None:
-        with self._lock:
-            current = self._topics.get(topic_id)
-            if current is None:
-                return None
-            updated = Topic.model_validate({**current.model_dump(), **data.model_dump(exclude_unset=True)})
-            self._topics[topic_id] = updated
-            return updated
+        topic = self.get(topic_id)
+        if topic is None:
+            return None
+        if data.title is not None:
+            topic.title = data.title
+        if data.author is not None:
+            topic.author = data.author
+        if data.status is not None:
+            topic.status = data.status
+        self.db.commit()
+        self.db.refresh(topic)
+        return topic
 
     def delete(self, topic_id: int) -> bool:
-        with self._lock:
-            return self._topics.pop(topic_id, None) is not None
+        topic = self.get(topic_id)
+        if topic is None:
+            return False
+        self.db.delete(topic)
+        self.db.commit()
+        return True
+
+
+class MessageStore:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create(self, topic_id: int, data: MessageCreate) -> Message:
+        message = Message(topic_id=topic_id, **data.model_dump())
+        self.db.add(message)
+        self.db.commit()
+        self.db.refresh(message)
+        return message
+
+    def list(self, topic_id: int) -> list[Message]:
+        statement = select(Message).where(Message.topic_id == topic_id).order_by(Message.id)
+        return self.db.scalars(statement).all()

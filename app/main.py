@@ -2,20 +2,34 @@ import logging
 from time import perf_counter
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Path, Query, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .schemas import ErrorResponse, HealthResponse, Topic, TopicCreate, TopicListQuery, TopicPatch
-from .storage import TopicStore
+from .database import get_db
+from .schemas import (
+    ErrorResponse,
+    HealthResponse,
+    Message,
+    MessageCreate,
+    Topic,
+    TopicCreate,
+    TopicListQuery,
+    TopicPatch,
+    TopicStats,
+)
+from .storage import MessageStore, TopicStore
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("forum.requests")
 TopicId = Annotated[int, Path(gt=0, description="Положительный идентификатор темы")]
 NOT_FOUND = {"error": "Тема не найдена", "field": "id"}
+CLOSED_TOPIC = {"error": "В закрытую тему нельзя добавлять сообщения", "field": "status"}
 
 
 def validation_message(error: dict) -> str:
@@ -44,15 +58,14 @@ def validation_message(error: dict) -> str:
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="Форум — лабораторная 1",
-        version="1.0.0",
+        title="Форум — лабораторная 2",
+        version="2.0.0",
         description=(
-            "CRUD тем форума. Данные хранятся в памяти одного процесса. "
+            "CRUD тем форума и сообщения внутри тем. Данные хранятся в SQLite и сохраняются после перезапуска. "
             "Статусы: open — открыта, closed — закрыта. "
         ),
         responses={400: {"model": ErrorResponse, "description": "Ошибка валидации"}},
     )
-    application.state.topics = TopicStore()
 
     @application.middleware("http")
     async def log_request(request: Request, call_next):
@@ -94,22 +107,28 @@ def create_app() -> FastAPI:
         tags=["Темы"], summary="Создать тему",
         responses={201: {"headers": {"Location": {"schema": {"type": "string"}}}}},
     )
-    def create_topic(data: TopicCreate, request: Request, response: Response):
-        topic = request.app.state.topics.create(data)
+    def create_topic(data: TopicCreate, response: Response, db: Session = Depends(get_db)):
+        topic = TopicStore(db).create(data)
         response.headers["Location"] = f"/api/topics/{topic.id}"
         return topic
 
     @application.get("/api/topics", response_model=list[Topic], tags=["Темы"], summary="Список тем")
-    def list_topics(query: Annotated[TopicListQuery, Query()], request: Request):
-        """Фильтры объединяются через И; затем применяются offset и limit. Порядок: id по возрастанию."""
-        return request.app.state.topics.list(query)
+    def list_topics(query: Annotated[TopicListQuery, Query()], db: Session = Depends(get_db)):
+        return TopicStore(db).list(query)
+
+    @application.get(
+        "/api/topics/stats", response_model=list[TopicStats],
+        tags=["Темы"], summary="Темы по количеству сообщений",
+    )
+    def topic_stats(db: Session = Depends(get_db)):
+        return TopicStore(db).stats()
 
     @application.get(
         "/api/topics/{topic_id}", response_model=Topic, tags=["Темы"], summary="Получить тему",
         responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
     )
-    def get_topic(topic_id: TopicId, request: Request):
-        topic = request.app.state.topics.get(topic_id)
+    def get_topic(topic_id: TopicId, db: Session = Depends(get_db)):
+        topic = TopicStore(db).get(topic_id)
         if topic is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return topic
@@ -118,9 +137,8 @@ def create_app() -> FastAPI:
         "/api/topics/{topic_id}", response_model=Topic, tags=["Темы"], summary="Изменить поля темы",
         responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
     )
-    def update_topic(topic_id: TopicId, data: TopicPatch, request: Request):
-        """Передайте одно или несколько полей. Пропущенные поля сохраняются; null запрещён."""
-        topic = request.app.state.topics.update(topic_id, data)
+    def update_topic(topic_id: TopicId, data: TopicPatch, db: Session = Depends(get_db)):
+        topic = TopicStore(db).update(topic_id, data)
         if topic is None:
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return topic
@@ -130,10 +148,39 @@ def create_app() -> FastAPI:
         tags=["Темы"], summary="Удалить тему",
         responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
     )
-    def delete_topic(topic_id: TopicId, request: Request):
-        if not request.app.state.topics.delete(topic_id):
+    def delete_topic(topic_id: TopicId, db: Session = Depends(get_db)):
+        if not TopicStore(db).delete(topic_id):
             raise HTTPException(status_code=404, detail=NOT_FOUND)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @application.post(
+        "/api/topics/{topic_id}/messages", response_model=Message, status_code=status.HTTP_201_CREATED,
+        tags=["Сообщения"], summary="Создать сообщение в теме",
+        responses={
+            404: {"model": ErrorResponse, "description": "Тема не найдена"},
+            409: {"model": ErrorResponse, "description": "Тема закрыта"},
+        },
+    )
+    def create_message(topic_id: TopicId, data: MessageCreate, db: Session = Depends(get_db)):
+        db.execute(text("BEGIN IMMEDIATE"))
+        topic = TopicStore(db).get(topic_id)
+        if topic is None:
+            db.rollback()
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        if topic.status == "closed":
+            db.rollback()
+            raise HTTPException(status_code=409, detail=CLOSED_TOPIC)
+        return MessageStore(db).create(topic_id, data)
+
+    @application.get(
+        "/api/topics/{topic_id}/messages", response_model=list[Message],
+        tags=["Сообщения"], summary="Список сообщений темы",
+        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+    )
+    def list_messages(topic_id: TopicId, db: Session = Depends(get_db)):
+        if TopicStore(db).get(topic_id) is None:
+            raise HTTPException(status_code=404, detail=NOT_FOUND)
+        return MessageStore(db).list(topic_id)
 
     def custom_openapi():
         if application.openapi_schema is None:

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
@@ -6,6 +7,7 @@ from pydantic_core import PydanticCustomError
 
 Title = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=200)]
 Author = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=100)]
+MessageText = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1, max_length=5000)]
 TopicStatus = Literal["open", "closed"]
 
 class TopicCreate(BaseModel):
@@ -36,7 +38,7 @@ class TopicPatch(BaseModel):
         return self
 
 class Topic(TopicCreate):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
     id: int = Field(gt=0, description="Идентификатор, назначенный сервером")
 
@@ -47,6 +49,29 @@ class TopicListQuery(BaseModel):
     offset: int = Field(default=0, ge=0, description="Сколько подходящих тем пропустить")
     author: Author | None = Field(default=None, description="Точное имя автора с учётом регистра")
     status: TopicStatus | None = Field(default=None, description="Фильтр по статусу")
+    q: Title | None = Field(default=None, description="Часть заголовка без учёта регистра")
+
+
+class TopicStats(BaseModel):
+    topic_id: int = Field(gt=0, description="Идентификатор темы")
+    title: str = Field(description="Заголовок темы")
+    message_count: int = Field(ge=0, description="Количество сообщений")
+
+
+class MessageCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    author: Author = Field(description="Имя автора", examples=["Иван"])
+    text: MessageText = Field(description="Текст сообщения", examples=["Привет всем!"])
+
+
+class Message(MessageCreate):
+    model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
+
+    id: int = Field(gt=0, description="Идентификатор сообщения")
+    topic_id: int = Field(gt=0, description="Идентификатор темы")
+    created_at: datetime = Field(description="Дата создания в UTC")
+
 
 class ErrorResponse(BaseModel):
     error: str

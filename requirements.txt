@@ -1,3 +1,7 @@
 fastapi==0.159.1
 pydantic==2.14.1
 uvicorn==0.54.0
+SQLAlchemy==2.0.57
+python-dotenv==1.2.1
+alembic==1.20.1
+backcheck @ git+https://github.com/bozhedom/backcheck@7ce898bdc33469ca7f2185da42d8d80265dddd21
