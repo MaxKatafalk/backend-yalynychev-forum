@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 
@@ -13,6 +13,7 @@ TopicStatus = Literal["open", "closed"]
 class TopicCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    owner_id: int | None = Field(default=None, exclude=True, description="Назначается сервером")
     title: Title = Field(description="Заголовок темы", examples=["Обсуждение Python"])
     author: Author = Field(description="Имя автора", examples=["Иван"])
     status: TopicStatus = Field(default="open", description="Открыта или закрыта")
@@ -40,6 +41,7 @@ class TopicPatch(BaseModel):
 class Topic(TopicCreate):
     model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
+    owner_id: int | None = None
     id: int = Field(gt=0, description="Идентификатор, назначенный сервером")
 
 class TopicListQuery(BaseModel):
@@ -61,6 +63,7 @@ class TopicStats(BaseModel):
 class MessageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    owner_id: int | None = Field(default=None, exclude=True, description="Назначается сервером")
     author: Author = Field(description="Имя автора", examples=["Иван"])
     text: MessageText = Field(description="Текст сообщения", examples=["Привет всем!"])
 
@@ -68,9 +71,38 @@ class MessageCreate(BaseModel):
 class Message(MessageCreate):
     model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
+    owner_id: int | None = None
     id: int = Field(gt=0, description="Идентификатор сообщения")
     topic_id: int = Field(gt=0, description="Идентификатор темы")
     created_at: datetime = Field(description="Дата создания в UTC")
+
+
+class UserRegister(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: Annotated[str, StringConstraints(
+        strict=True, strip_whitespace=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$"
+    )]
+    password: SecretStr = Field(min_length=8, max_length=128)
+
+
+class UserLogin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    password: SecretStr
+
+
+class AccessToken(BaseModel):
+    access_token: str
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: Literal["user", "admin"]
 
 
 class ErrorResponse(BaseModel):
