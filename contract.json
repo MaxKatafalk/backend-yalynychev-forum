@@ -5,7 +5,8 @@
     "register_path": "/auth/register",
     "me_path": "/auth/me",
     "login_field": "username",
-    "password_field": "password"
+    "password_field": "password",
+    "owner_field": "owner_id"
   },
   "resource": "topics",
   "id_field": "id",

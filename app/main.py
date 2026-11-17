@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .auth import get_current_user
 from .database import get_db
+from .models import Topic as TopicRecord
 from .models import User
 from .schemas import (
     ErrorResponse,
@@ -33,6 +34,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("forum.requests")
 TopicId = Annotated[int, Path(gt=0, description="Положительный идентификатор темы")]
 NOT_FOUND = {"error": "Тема не найдена", "field": "id"}
+FORBIDDEN = {"error": "Изменять или удалять тему может только её владелец", "field": "owner_id"}
 CLOSED_TOPIC = {"error": "В закрытую тему нельзя добавлять сообщения", "field": "status"}
 
 
@@ -61,6 +63,20 @@ def validation_message(error: dict) -> str:
         "empty_patch": "Передайте хотя бы одно поле для обновления",
     }
     return messages.get(kind, "Некорректное значение")
+
+
+def get_owned_topic(
+    topic_id: TopicId,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TopicRecord:
+    db.execute(text("BEGIN IMMEDIATE"))
+    topic = TopicStore(db).get(topic_id)
+    if topic is None:
+        raise HTTPException(status_code=404, detail=NOT_FOUND)
+    if topic.owner_id != user.id:
+        raise HTTPException(status_code=403, detail=FORBIDDEN)
+    return topic
 
 
 def create_app() -> FastAPI:
@@ -131,10 +147,16 @@ def create_app() -> FastAPI:
     @application.post(
         "/api/topics", response_model=Topic, status_code=status.HTTP_201_CREATED,
         tags=["Темы"], summary="Создать тему",
-        responses={201: {"headers": {"Location": {"schema": {"type": "string"}}}}},
+        responses={
+            201: {"headers": {"Location": {"schema": {"type": "string"}}}},
+            401: {"model": ErrorResponse, "description": "Требуется вход"},
+        },
     )
-    def create_topic(data: TopicCreate, response: Response, db: Session = Depends(get_db)):
-        topic = TopicStore(db).create(data)
+    def create_topic(
+        data: TopicCreate, response: Response,
+        user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    ):
+        topic = TopicStore(db).create(data, user.id)
         response.headers["Location"] = f"/api/topics/{topic.id}"
         return topic
 
@@ -161,33 +183,41 @@ def create_app() -> FastAPI:
 
     @application.patch(
         "/api/topics/{topic_id}", response_model=Topic, tags=["Темы"], summary="Изменить поля темы",
-        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+        responses={
+            401: {"model": ErrorResponse, "description": "Требуется вход"},
+            403: {"model": ErrorResponse, "description": "У пользователя нет прав на эту тему"},
+            404: {"model": ErrorResponse, "description": "Тема не найдена"},
+        },
     )
-    def update_topic(topic_id: TopicId, data: TopicPatch, db: Session = Depends(get_db)):
-        topic = TopicStore(db).update(topic_id, data)
-        if topic is None:
-            raise HTTPException(status_code=404, detail=NOT_FOUND)
-        return topic
+    def update_topic(data: TopicPatch, topic: TopicRecord = Depends(get_owned_topic), db: Session = Depends(get_db)):
+        return TopicStore(db).update(topic, data)
 
     @application.delete(
         "/api/topics/{topic_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response,
         tags=["Темы"], summary="Удалить тему",
-        responses={404: {"model": ErrorResponse, "description": "Тема не найдена"}},
+        responses={
+            401: {"model": ErrorResponse, "description": "Требуется вход"},
+            403: {"model": ErrorResponse, "description": "У пользователя нет прав на эту тему"},
+            404: {"model": ErrorResponse, "description": "Тема не найдена"},
+        },
     )
-    def delete_topic(topic_id: TopicId, db: Session = Depends(get_db)):
-        if not TopicStore(db).delete(topic_id):
-            raise HTTPException(status_code=404, detail=NOT_FOUND)
+    def delete_topic(topic: TopicRecord = Depends(get_owned_topic), db: Session = Depends(get_db)):
+        TopicStore(db).delete(topic)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     @application.post(
         "/api/topics/{topic_id}/messages", response_model=Message, status_code=status.HTTP_201_CREATED,
         tags=["Сообщения"], summary="Создать сообщение в теме",
         responses={
+            401: {"model": ErrorResponse, "description": "Требуется вход"},
             404: {"model": ErrorResponse, "description": "Тема не найдена"},
             409: {"model": ErrorResponse, "description": "Тема закрыта"},
         },
     )
-    def create_message(topic_id: TopicId, data: MessageCreate, db: Session = Depends(get_db)):
+    def create_message(
+        topic_id: TopicId, data: MessageCreate,
+        user: User = Depends(get_current_user), db: Session = Depends(get_db),
+    ):
         db.execute(text("BEGIN IMMEDIATE"))
         topic = TopicStore(db).get(topic_id)
         if topic is None:
@@ -196,7 +226,7 @@ def create_app() -> FastAPI:
         if topic.status == "closed":
             db.rollback()
             raise HTTPException(status_code=409, detail=CLOSED_TOPIC)
-        return MessageStore(db).create(topic_id, data)
+        return MessageStore(db).create(topic_id, data, user.id)
 
     @application.get(
         "/api/topics/{topic_id}/messages", response_model=list[Message],

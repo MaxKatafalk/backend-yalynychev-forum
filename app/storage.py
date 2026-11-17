@@ -11,8 +11,8 @@ class TopicStore:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, data: TopicCreate) -> Topic:
-        topic = Topic(**data.model_dump())
+    def create(self, data: TopicCreate, owner_id: int) -> Topic:
+        topic = Topic(owner_id=owner_id, **data.model_dump())
         self.db.add(topic)
         self.db.commit()
         self.db.refresh(topic)
@@ -42,10 +42,7 @@ class TopicStore:
         )
         return self.db.execute(statement).mappings().all()
 
-    def update(self, topic_id: int, data: TopicPatch) -> Topic | None:
-        topic = self.get(topic_id)
-        if topic is None:
-            return None
+    def update(self, topic: Topic, data: TopicPatch) -> Topic:
         if data.title is not None:
             topic.title = data.title
         if data.author is not None:
@@ -56,21 +53,17 @@ class TopicStore:
         self.db.refresh(topic)
         return topic
 
-    def delete(self, topic_id: int) -> bool:
-        topic = self.get(topic_id)
-        if topic is None:
-            return False
+    def delete(self, topic: Topic) -> None:
         self.db.delete(topic)
         self.db.commit()
-        return True
 
 
 class MessageStore:
     def __init__(self, db: Session):
         self.db = db
 
-    def create(self, topic_id: int, data: MessageCreate) -> Message:
-        message = Message(topic_id=topic_id, **data.model_dump())
+    def create(self, topic_id: int, data: MessageCreate, owner_id: int) -> Message:
+        message = Message(topic_id=topic_id, owner_id=owner_id, **data.model_dump())
         self.db.add(message)
         self.db.commit()
         self.db.refresh(message)

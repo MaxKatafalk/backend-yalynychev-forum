@@ -13,6 +13,7 @@ TopicStatus = Literal["open", "closed"]
 class TopicCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    owner_id: int | None = Field(default=None, exclude=True, description="Назначается сервером")
     title: Title = Field(description="Заголовок темы", examples=["Обсуждение Python"])
     author: Author = Field(description="Имя автора", examples=["Иван"])
     status: TopicStatus = Field(default="open", description="Открыта или закрыта")
@@ -40,6 +41,7 @@ class TopicPatch(BaseModel):
 class Topic(TopicCreate):
     model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
+    owner_id: int | None = None
     id: int = Field(gt=0, description="Идентификатор, назначенный сервером")
 
 class TopicListQuery(BaseModel):
@@ -61,6 +63,7 @@ class TopicStats(BaseModel):
 class MessageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    owner_id: int | None = Field(default=None, exclude=True, description="Назначается сервером")
     author: Author = Field(description="Имя автора", examples=["Иван"])
     text: MessageText = Field(description="Текст сообщения", examples=["Привет всем!"])
 
@@ -68,6 +71,7 @@ class MessageCreate(BaseModel):
 class Message(MessageCreate):
     model_config = ConfigDict(extra="forbid", frozen=True, from_attributes=True)
 
+    owner_id: int | None = None
     id: int = Field(gt=0, description="Идентификатор сообщения")
     topic_id: int = Field(gt=0, description="Идентификатор темы")
     created_at: datetime = Field(description="Дата создания в UTC")
