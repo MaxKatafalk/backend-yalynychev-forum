@@ -1,5 +1,11 @@
 {
   "base_url": "http://localhost:8000",
+  "auth": {
+    "scheme": "basic",
+    "register_path": "/auth/register",
+    "login_field": "username",
+    "password_field": "password"
+  },
   "resource": "topics",
   "id_field": "id",
   "missing_id": "999999",

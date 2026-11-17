@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 
 from .database import Base
 
@@ -23,3 +23,12 @@ class Message(Base):
     author = Column(String(100), nullable=False)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False, server_default=func.current_timestamp())
+
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(64), nullable=False)
+    password_hash = Column(Text, nullable=False)

@@ -1,8 +1,10 @@
+from argon2 import PasswordHasher
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Message, Topic
-from .schemas import MessageCreate, TopicCreate, TopicListQuery, TopicPatch
+from .models import Message, Topic, User
+from .schemas import MessageCreate, TopicCreate, TopicListQuery, TopicPatch, UserRegister
 
 
 class TopicStore:
@@ -77,3 +79,26 @@ class MessageStore:
     def list(self, topic_id: int) -> list[Message]:
         statement = select(Message).where(Message.topic_id == topic_id).order_by(Message.id)
         return self.db.scalars(statement).all()
+
+
+class UserStore:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_username(self, username: str) -> User | None:
+        return self.db.scalar(select(User).where(User.username == username))
+
+    def register(self, data: UserRegister) -> User | None:
+        username = data.username
+        password_hash = PasswordHasher().hash(data.password.get_secret_value())
+        user = User(username=username, password_hash=password_hash)
+        self.db.add(user)
+        try:
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            if self.get_by_username(username) is not None:
+                return None
+            raise
+        self.db.refresh(user)
+        return user

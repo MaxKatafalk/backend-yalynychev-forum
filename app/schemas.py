@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints, field_validator, model_validator
 from pydantic_core import PydanticCustomError
 
 
@@ -71,6 +71,22 @@ class Message(MessageCreate):
     id: int = Field(gt=0, description="Идентификатор сообщения")
     topic_id: int = Field(gt=0, description="Идентификатор темы")
     created_at: datetime = Field(description="Дата создания в UTC")
+
+
+class UserRegister(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: Annotated[str, StringConstraints(
+        strict=True, strip_whitespace=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.-]+$"
+    )]
+    password: SecretStr = Field(min_length=8, max_length=128)
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
 
 
 class ErrorResponse(BaseModel):

@@ -21,8 +21,10 @@ from .schemas import (
     TopicListQuery,
     TopicPatch,
     TopicStats,
+    UserRegister,
+    UserResponse,
 )
-from .storage import MessageStore, TopicStore
+from .storage import MessageStore, TopicStore, UserStore
 
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -39,6 +41,9 @@ def validation_message(error: dict) -> str:
         "missing": "Обязательное поле отсутствует",
         "string_type": "Ожидается строка",
         "string_too_short": "Строка не должна быть пустой или состоять из пробелов",
+        "too_short": f"Минимальная длина: {context.get('min_length')} символов",
+        "too_long": f"Максимальная длина: {context.get('max_length')} символов",
+        "string_pattern_mismatch": "Допустимы латинские буквы, цифры, точка, дефис и подчёркивание",
         "string_too_long": f"Максимальная длина: {context.get('max_length')} символов",
         "literal_error": "Недопустимое значение; ожидается open или closed",
         "extra_forbidden": "Неизвестное поле",
@@ -101,6 +106,17 @@ def create_app() -> FastAPI:
     @application.get("/health", response_model=HealthResponse, tags=["Состояние"], summary="Проверка сервиса")
     def health():
         return HealthResponse()
+
+    @application.post(
+        "/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED,
+        tags=["Пользователи"], summary="Зарегистрировать пользователя",
+        responses={409: {"model": ErrorResponse, "description": "Логин уже занят"}},
+    )
+    def register_user(data: UserRegister, db: Session = Depends(get_db)):
+        user = UserStore(db).register(data)
+        if user is None:
+            raise HTTPException(status_code=409, detail={"error": "Логин уже занят", "field": "username"})
+        return user
 
     @application.post(
         "/api/topics", response_model=Topic, status_code=status.HTTP_201_CREATED,
