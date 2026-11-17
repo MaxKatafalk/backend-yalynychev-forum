@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBasic, HTTPBasicC
 from sqlalchemy.orm import Session
 
 from .database import get_db
+from .login_limit import LoginLimiter
 from .models import User
 from .storage import UserStore
 
@@ -20,6 +21,7 @@ dummy_hash = password_hasher.hash(token_urlsafe())
 JWT_SECRET = getenv("JWT_SECRET", "")
 JWT_TTL_SECONDS = int(getenv("JWT_TTL_SECONDS", "3600"))
 JWT_ALGORITHM = "HS256"
+login_limiter = LoginLimiter()
 
 if JWT_TTL_SECONDS < 1:
     raise ValueError("JWT_TTL_SECONDS должен быть положительным целым числом")
@@ -53,8 +55,15 @@ basic_auth = ForumBasicAuth(auto_error=False)
 bearer_auth = HTTPBearer(auto_error=False, bearerFormat="JWT")
 
 
-def authenticate(username: str, password: str, db: Session) -> User:
-    user = UserStore(db).get_by_username(username.strip())
+def authenticate(username: str, password: str, db: Session, request: Request) -> User:
+    username = username.strip()
+    host = request.client.host if request.client else ""
+    with login_limiter.attempt(host, username):
+        return verify_credentials(username, password, db)
+
+
+def verify_credentials(username: str, password: str, db: Session) -> User:
+    user = UserStore(db).get_by_username(username)
     password_hash = user.password_hash if user is not None else dummy_hash
     try:
         password_hasher.verify(password_hash, password)
@@ -107,12 +116,13 @@ def user_from_token(token: str, db: Session) -> User:
 
 
 def get_current_user(
+    request: Request,
     basic: HTTPBasicCredentials | None = Depends(basic_auth),
     bearer: HTTPAuthorizationCredentials | None = Depends(bearer_auth),
     db: Session = Depends(get_db),
 ) -> User:
     if basic is not None:
-        return authenticate(basic.username, basic.password, db)
+        return authenticate(basic.username, basic.password, db, request)
     if bearer is not None:
         return user_from_token(bearer.credentials, db)
     raise unauthorized()

@@ -8,7 +8,8 @@
     "token_field": "access_token",
     "login_field": "username",
     "password_field": "password",
-    "owner_field": "owner_id"
+    "owner_field": "owner_id",
+    "admin": {"username": "backcheck_admin", "password": "admin-test-pass"}
   },
   "resource": "topics",
   "id_field": "id",

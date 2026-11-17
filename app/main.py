@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("forum.requests")
 TopicId = Annotated[int, Path(gt=0, description="Положительный идентификатор темы")]
 NOT_FOUND = {"error": "Тема не найдена", "field": "id"}
-FORBIDDEN = {"error": "Изменять или удалять тему может только её владелец", "field": "owner_id"}
+FORBIDDEN = {"error": "Изменять или удалять тему может её владелец или администратор", "field": "owner_id"}
 CLOSED_TOPIC = {"error": "В закрытую тему нельзя добавлять сообщения", "field": "status"}
 
 
@@ -76,15 +76,15 @@ def get_owned_topic(
     topic = TopicStore(db).get(topic_id)
     if topic is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
-    if topic.owner_id != user.id:
+    if topic.owner_id != user.id and user.role != "admin":
         raise HTTPException(status_code=403, detail=FORBIDDEN)
     return topic
 
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="Форум — лабораторная 2",
-        version="2.0.0",
+        title="Форум — лабораторная 3",
+        version="3.0.0",
         description=(
             "CRUD тем форума и сообщения внутри тем. Данные хранятся в SQLite и сохраняются после перезапуска. "
             "Статусы: open — открыта, closed — закрыта. "
@@ -143,17 +143,21 @@ def create_app() -> FastAPI:
         tags=["Пользователи"], summary="Получить JWT",
         responses={
             401: {"model": ErrorResponse, "description": "Не удалось подтвердить вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
             503: {"model": ErrorResponse, "description": "JWT не настроен"},
         },
     )
-    def login(data: UserLogin, db: Session = Depends(get_db)):
-        user = authenticate(data.username, data.password.get_secret_value(), db)
+    def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
+        user = authenticate(data.username, data.password.get_secret_value(), db, request)
         return AccessToken(access_token=create_access_token(user))
 
     @application.get(
         "/auth/me", response_model=UserResponse,
         tags=["Пользователи"], summary="Текущий пользователь",
-        responses={401: {"model": ErrorResponse, "description": "Не удалось подтвердить вход"}},
+        responses={
+            401: {"model": ErrorResponse, "description": "Не удалось подтвердить вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
+        },
     )
     def current_user(user: User = Depends(get_current_user)):
         return user
@@ -164,6 +168,7 @@ def create_app() -> FastAPI:
         responses={
             201: {"headers": {"Location": {"schema": {"type": "string"}}}},
             401: {"model": ErrorResponse, "description": "Требуется вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
         },
     )
     def create_topic(
@@ -199,6 +204,7 @@ def create_app() -> FastAPI:
         "/api/topics/{topic_id}", response_model=Topic, tags=["Темы"], summary="Изменить поля темы",
         responses={
             401: {"model": ErrorResponse, "description": "Требуется вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
             403: {"model": ErrorResponse, "description": "У пользователя нет прав на эту тему"},
             404: {"model": ErrorResponse, "description": "Тема не найдена"},
         },
@@ -211,6 +217,7 @@ def create_app() -> FastAPI:
         tags=["Темы"], summary="Удалить тему",
         responses={
             401: {"model": ErrorResponse, "description": "Требуется вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
             403: {"model": ErrorResponse, "description": "У пользователя нет прав на эту тему"},
             404: {"model": ErrorResponse, "description": "Тема не найдена"},
         },
@@ -224,6 +231,7 @@ def create_app() -> FastAPI:
         tags=["Сообщения"], summary="Создать сообщение в теме",
         responses={
             401: {"model": ErrorResponse, "description": "Требуется вход"},
+            429: {"model": ErrorResponse, "description": "Слишком много попыток входа"},
             404: {"model": ErrorResponse, "description": "Тема не найдена"},
             409: {"model": ErrorResponse, "description": "Тема закрыта"},
         },

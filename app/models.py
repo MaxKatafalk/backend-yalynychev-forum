@@ -34,3 +34,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String(64), nullable=False)
     password_hash = Column(Text, nullable=False)
+    role = Column(
+        String(8), CheckConstraint("role IN ('user', 'admin')", name="ck_users_role"),
+        nullable=False, server_default="user",
+    )

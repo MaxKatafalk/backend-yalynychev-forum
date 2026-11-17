@@ -102,6 +102,7 @@ class UserResponse(BaseModel):
 
     id: int
     username: str
+    role: Literal["user", "admin"]
 
 
 class ErrorResponse(BaseModel):
