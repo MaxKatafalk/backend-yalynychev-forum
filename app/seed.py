@@ -11,8 +11,8 @@ from .storage import UserStore
 
 
 DEMO_ACCOUNTS = {
-    "demo_ivan": "demo-pass-123",
-    "demo_anna": "demo-pass-456",
+    "demo_ivan": "123",
+    "demo_anna": "456",
 }
 
 
