@@ -3,6 +3,7 @@
   "auth": {
     "scheme": "basic",
     "register_path": "/auth/register",
+    "me_path": "/auth/me",
     "login_field": "username",
     "password_field": "password"
   },

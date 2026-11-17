@@ -10,7 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from .auth import get_current_user
 from .database import get_db
+from .models import User
 from .schemas import (
     ErrorResponse,
     HealthResponse,
@@ -116,6 +118,14 @@ def create_app() -> FastAPI:
         user = UserStore(db).register(data)
         if user is None:
             raise HTTPException(status_code=409, detail={"error": "Логин уже занят", "field": "username"})
+        return user
+
+    @application.get(
+        "/auth/me", response_model=UserResponse,
+        tags=["Пользователи"], summary="Текущий пользователь",
+        responses={401: {"model": ErrorResponse, "description": "Не удалось подтвердить вход"}},
+    )
+    def current_user(user: User = Depends(get_current_user)):
         return user
 
     @application.post(
