@@ -1,53 +1,63 @@
 [
   {
-    "title": "Обсуждение Python",
+    "title": "Демо: Обсуждение Python",
     "author": "Иван",
     "status": "open",
     "messages": [
       {
         "author": "Анна",
-        "text": "Как установить зависимости проекта?"
+        "text": "Как установить зависимости проекта?",
+        "owner": "demo_anna"
       },
       {
         "author": "Иван",
-        "text": "Используйте pip install -r requirements.txt."
+        "text": "Используйте pip install -r requirements.txt.",
+        "owner": "demo_ivan"
       },
       {
-        "author": "Максим",
-        "text": "Спасибо, всё установилось!"
+        "author": "Анна",
+        "text": "Спасибо, всё установилось!",
+        "owner": "demo_anna"
       }
-    ]
+    ],
+    "owner": "demo_ivan"
   },
   {
-    "title": "Вопросы по FastAPI",
+    "title": "Демо: Вопросы по FastAPI",
     "author": "Анна",
     "status": "open",
     "messages": [
       {
         "author": "Иван",
-        "text": "Где посмотреть документацию API?"
+        "text": "Где посмотреть документацию API?",
+        "owner": "demo_ivan"
       },
       {
         "author": "Анна",
-        "text": "Откройте страницу /docs."
+        "text": "Откройте страницу /docs.",
+        "owner": "demo_anna"
       }
-    ]
+    ],
+    "owner": "demo_anna"
   },
   {
-    "title": "Правила форума",
-    "author": "Максим",
+    "title": "Демо: Правила форума",
+    "author": "Анна",
     "status": "closed",
     "messages": [
       {
-        "author": "Максим",
-        "text": "Общайтесь вежливо и не публикуйте спам."
+        "author": "Анна",
+        "text": "Общайтесь вежливо и не публикуйте спам.",
+        "owner": "demo_anna"
       }
-    ]
+    ],
+    "owner": "demo_anna"
   },
   {
-    "title": "Работа с SQLite",
+    "title": "Демо: Работа с SQLite",
     "author": "Иван",
     "status": "open",
-    "messages": []
+    "messages": [],
+    "owner": "demo_ivan"
   }
 ]
