@@ -10,11 +10,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .auth import get_current_user
+from .auth import authenticate, create_access_token, get_current_user
 from .database import get_db
 from .models import Topic as TopicRecord
 from .models import User
 from .schemas import (
+    AccessToken,
     ErrorResponse,
     HealthResponse,
     Message,
@@ -24,6 +25,7 @@ from .schemas import (
     TopicListQuery,
     TopicPatch,
     TopicStats,
+    UserLogin,
     UserRegister,
     UserResponse,
 )
@@ -135,6 +137,18 @@ def create_app() -> FastAPI:
         if user is None:
             raise HTTPException(status_code=409, detail={"error": "Логин уже занят", "field": "username"})
         return user
+
+    @application.post(
+        "/auth/login", response_model=AccessToken,
+        tags=["Пользователи"], summary="Получить JWT",
+        responses={
+            401: {"model": ErrorResponse, "description": "Не удалось подтвердить вход"},
+            503: {"model": ErrorResponse, "description": "JWT не настроен"},
+        },
+    )
+    def login(data: UserLogin, db: Session = Depends(get_db)):
+        user = authenticate(data.username, data.password.get_secret_value(), db)
+        return AccessToken(access_token=create_access_token(user))
 
     @application.get(
         "/auth/me", response_model=UserResponse,

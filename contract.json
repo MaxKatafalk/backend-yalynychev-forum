@@ -4,6 +4,8 @@
     "scheme": "basic",
     "register_path": "/auth/register",
     "me_path": "/auth/me",
+    "login_path": "/auth/login",
+    "token_field": "access_token",
     "login_field": "username",
     "password_field": "password",
     "owner_field": "owner_id"

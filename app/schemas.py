@@ -86,6 +86,17 @@ class UserRegister(BaseModel):
     password: SecretStr = Field(min_length=8, max_length=128)
 
 
+class UserLogin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    password: SecretStr
+
+
+class AccessToken(BaseModel):
+    access_token: str
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
